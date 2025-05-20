@@ -1,5 +1,5 @@
 
-<img src="https://github.com/user-attachments/assets/a6ab4375-580a-4ae3-a8f6-0fd9cd856872)" width="300" style="display: block; margin: 0 auto;">
+<img src="https://github.com/user-attachments/assets/a6ab4375-580a-4ae3-a8f6-0fd9cd856872" width="300" style="display: block; margin: 0 auto;">
 ![version](https://img.shields.io/badge/version-2.3.0-green)
 ![Tests](https://img.shields.io/badge/Tests-failing-red)
 ![commit activity](https://img.shields.io/badge/commit%20activity-92/month-yellow)
