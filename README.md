@@ -1,6 +1,7 @@
 ![76a6fe2a680709204a5473aefe2ef72e](https://github.com/user-attachments/assets/a6ab4375-580a-4ae3-a8f6-0fd9cd856872)
-智能体功能扩展开源社区​
-
+智能体功能扩展开
+https://github.com/aiseall/agentboost源社区​
+https://github.com/aiseall/agentboost
 # AgentBoost
 # 🔥 项目简介​
 AgentBoost 是一个专为 Coze、Dify 等智能体开发框架设计的功能扩展生态系统，致力于解决现有框架能力缺口问题。通过提供文件处理、多模态生成、自定义插件等开箱即用的工具，让开发者无需编写复杂底层代码，即可快速扩展智能体功能，实现高效开发、省力集成、省时落地。我们的目标是构建一个开放协作的开发者社区，让任何人都能轻松突破框架限制，释放智能体的无限潜力。​
