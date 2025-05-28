@@ -1,0 +1,110 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  dependabot-auto-merge:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Wait for status checks
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: 'test'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+          allowed-conclusions: success,skipped,neutral
+        continue-on-error: true
+
+      - name: Check if tests exist
+        id: check-tests
+        run: |
+          # Check for common test patterns
+          if find . -name "*test*" -o -name "*spec*" | grep -q .; then
+            echo "tests_exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_exist=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check for common test configuration files
+          if [ -f "package.json" ] || [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "Makefile" ] || [ -f "pytest.ini" ] || [ -f "tox.ini" ]; then
+            echo "test_config_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "test_config_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-merge for patch and minor updates
+        if: |
+          (steps.metadata.outputs.update-type == 'version-update:semver-patch' || 
+           steps.metadata.outputs.update-type == 'version-update:semver-minor') &&
+          (steps.check-tests.outputs.tests_exist == 'false' || 
+           github.event.pull_request.mergeable_state == 'clean')
+        run: |
+          echo "Auto-merging Dependabot PR for ${{ steps.metadata.outputs.update-type }} update"
+          gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-approve patch and minor updates
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' || 
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: |
+          echo "Auto-approving Dependabot PR for ${{ steps.metadata.outputs.update-type }} update"
+          gh pr review --approve "${{ github.event.pull_request.html_url }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on major updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr comment "${{ github.event.pull_request.html_url }}" --body "🚨 **Major version update detected!** 
+          
+          This PR contains a major version update that may include breaking changes. Please review manually before merging.
+          
+          **Update type:** ${{ steps.metadata.outputs.update-type }}
+          **Package:** ${{ steps.metadata.outputs.dependency-names }}
+          **From:** ${{ steps.metadata.outputs.previous-version }}
+          **To:** ${{ steps.metadata.outputs.new-version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add labels
+        run: |
+          gh pr edit "${{ github.event.pull_request.html_url }}" --add-label "dependencies"
+          
+          # Add specific labels based on update type
+          case "${{ steps.metadata.outputs.update-type }}" in
+            "version-update:semver-patch")
+              gh pr edit "${{ github.event.pull_request.html_url }}" --add-label "patch-update"
+              ;;
+            "version-update:semver-minor")
+              gh pr edit "${{ github.event.pull_request.html_url }}" --add-label "minor-update"
+              ;;
+            "version-update:semver-major")
+              gh pr edit "${{ github.event.pull_request.html_url }}" --add-label "major-update"
+              ;;
+          esac
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

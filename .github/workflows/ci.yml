@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Add more versions as needed
+        python-version: [3.8, 3.9, "3.10", "3.11"]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Check if Python project exists
+      id: check-python
+      run: |
+        if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+          echo "python_project=true" >> $GITHUB_OUTPUT
+        else
+          echo "python_project=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Install Python dependencies
+      if: steps.check-python.outputs.python_project == 'true'
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+        if [ -f pyproject.toml ]; then pip install -e .; fi
+    
+    - name: Check if Node.js project exists
+      id: check-node
+      run: |
+        if [ -f "package.json" ]; then
+          echo "node_project=true" >> $GITHUB_OUTPUT
+        else
+          echo "node_project=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Set up Node.js
+      if: steps.check-node.outputs.node_project == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install Node.js dependencies
+      if: steps.check-node.outputs.node_project == 'true'
+      run: npm ci
+    
+    - name: Run Python tests
+      if: steps.check-python.outputs.python_project == 'true'
+      run: |
+        # Try different test runners
+        if [ -f "pytest.ini" ] || [ -f "pyproject.toml" ] || find . -name "*test*.py" | grep -q .; then
+          python -m pytest
+        elif [ -f "tox.ini" ]; then
+          pip install tox
+          tox
+        elif find . -name "*test*.py" | grep -q .; then
+          python -m unittest discover
+        else
+          echo "No Python tests found, skipping..."
+        fi
+    
+    - name: Run Node.js tests
+      if: steps.check-node.outputs.node_project == 'true'
+      run: npm test
+    
+    - name: Run linting (Python)
+      if: steps.check-python.outputs.python_project == 'true'
+      run: |
+        # Install and run common linters if they're in requirements
+        if pip list | grep -q flake8; then flake8 .; fi
+        if pip list | grep -q black; then black --check .; fi
+        if pip list | grep -q isort; then isort --check-only .; fi
+      continue-on-error: true
+    
+    - name: Run linting (Node.js)
+      if: steps.check-node.outputs.node_project == 'true'
+      run: |
+        if npm list eslint &>/dev/null; then npm run lint; fi
+      continue-on-error: true
+    
+    - name: No tests found
+      if: steps.check-python.outputs.python_project == 'false' && steps.check-node.outputs.node_project == 'false'
+      run: |
+        echo "No test configuration found. This is a placeholder CI workflow."
+        echo "When you add tests to your project, this workflow will automatically run them."
+        echo "Supported test frameworks:"
+        echo "  - Python: pytest, unittest, tox"
+        echo "  - Node.js: npm test"
+        exit 0
